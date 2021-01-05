@@ -17,6 +17,7 @@ class SearchEngineBase(object):
     def main(search_engine):
         #需要创建如下文件，并在其中填充英文文本
         for file_path in ['1.txt', '2.txt', '3.txt', '4.txt', '5.txt']:
+            #子类调用main方法时候，顺手继承了 add_corpus 方法
             search_engine.add_corpus(file_path)
             while True:
                 query = input()
