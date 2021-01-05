@@ -1,3 +1,4 @@
+#基类
 class SearchEngineBase(object):
     def __init__(self):
         pass
@@ -12,8 +13,9 @@ class SearchEngineBase(object):
     #处理询问，通过索引引擎返回
     def search(self, query):
         raise Exception('search not implemented.')
-
+    
     def main(search_engine):
+        #需要创建如下文件，并在其中填充英文文本
         for file_path in ['1.txt', '2.txt', '3.txt', '4.txt', '5.txt']:
             search_engine.add_corpus(file_path)
             while True:
@@ -37,5 +39,7 @@ class SimpleEngine(SearchEngineBase):
             if query in text:
                 results.append(id)
         return results
+
 search_engine = SimpleEngine()
+#可以直接调用父类中的方法，子类中没有重写
 search_engine.main()
