@@ -1,0 +1,13 @@
+	httpRetCode = web_get_int_property(HTTP_INFO_RETURN_CODE);
+	if(httpRetCode == 200 && strcmp(lr_eval_string("{code}"), "200") == 0)
+		lr_end_transaction("corp_v2_customer_get", LR_PASS);
+	else
+		lr_end_transaction("corp_v2_customer_get", LR_FAIL);
+		
+		
+		
+	//httpRetCode = web_get_int_property(HTTP_INFO_RETURN_CODE);
+	if (strcmp(lr_eval_string("{lt_status}"), "OK") ==0 )
+		lr_end_transaction("corp_authentication", LR_PASS);
+	else
+		lr_end_transaction("corp_authentication", LR_FAIL);
