@@ -1,0 +1,17 @@
+#!/bin/bash
+# FNM 是实际修改文件访问权限的列表
+# 格式为两个字段，第一为 3 位 8 进数，第二字段位全路径文件名
+# 非常适合组成 chmod 执行时的样子，执行效率最高
+# 允许行首加“#”使该行失效
+
+FNM=chmod_list.wk
+cat << EOF > test
+755 a1
+753 a2
+EOF
+
+sed -e "/#/d; /^[ \t]*$/d" $FNM | while read line; do
+	echo "sudo bash chmod $line"
+done
+exit
+
