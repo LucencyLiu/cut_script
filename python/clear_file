@@ -1,0 +1,26 @@
+import os
+import shutil
+
+delete_dir=["result1"]
+delete_file=["mdrv_cmd.txt", "options.txt", "output.txt", "pre_cci.c"]
+
+def del_files(path):
+	for root, dirs, files in os.walk(path):
+		if root.find(".git") != -1:
+			continue
+		if root.endswith("result1"):
+			shutil.rmtree(root)
+			print ("Delete Dir: " + root)
+		for name in files:
+			if name in delete_file:
+				os.remove(os.path.join(root, name))
+				print ("Delete File: " + os.path.join(root, name))
+			if name.endswith(".bak") or name.endswith(".ci") or name.startswith("combined") or name.endswith(".log") or name.endswith(".idx"):
+				os.remove(os.path.join(root, name))
+				print ("Delete File: " + os.path.join(root, name))
+
+
+if __name__ == "__main__":
+	del_files(path=os.getcwd())
+
+input()
