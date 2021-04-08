@@ -1,0 +1,223 @@
+# -*- coding:utf-8 -*-
+from __future__ import unicode_literals
+
+from basic.mysql_config import MONIT_DB_NAME, DB_HOST, DB_PORT, DB_USER, DB_PASSWORD
+#from cryption import AesPrpCrypt
+import pymysql
+import sys
+import logging
+
+def dqlMysqlDmlYield(host, port, user, passwd, db):
+    """
+    数据库连接生成器
+    bug1：异常处理未实现：数据差不多，sql出错，
+    """
+    i = 0
+    print("[OPEN] MYSQL...............................................")
+    conn = pymysql.connect(
+        host=host,
+        port=port,
+        user=user,
+        passwd=passwd,
+        db=db,
+        charset='utf8',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    cur = conn.cursor()
+    cur.execute('SET NAMES utf8;')
+    cur.execute('SET CHARACTER SET utf8;')
+    cur.execute('SET character_set_connection=utf8;')
+    cur.execute('SET SESSION group_concat_max_len = 18446744073709547520;')
+    sql =''
+    while True:
+        # 获取所有记录列表
+        sql = yield cur.fetchall()
+        if sql == "STP":
+            break
+        print("[EXECUTE]", sql)
+        cur.execute(sql)
+    conn.close()
+    cur.close()
+    print("[CLOSE] MYSQL...............................................")
+    yield
+
+
+def dmlMysqlDmlYield(host, port, user, passwd, db):
+    """
+    数据库连接生成器
+    """
+    i = 0
+    conn = pymysql.connect(
+        host=host,
+        port=port,
+        user=user,
+        passwd=passwd,
+        db=db,
+        charset='utf8',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+    cur = conn.cursor()
+    cur.execute('SET NAMES utf8;')
+    cur.execute('SET CHARACTER SET utf8;')
+    cur.execute('SET character_set_connection=utf8;')
+    cur.execute('SET SESSION group_concat_max_len = 18446744073709547520;')
+    sql =''
+    while True:
+        # 获取所有记录列表
+        sql = yield cur.fetchall()
+        if sql == "STP":
+            break
+        print("[EXECUTE]", "*"*30)
+        print("[Delete]", sql)
+        cur.execute(sql)
+        conn.commit()
+    conn.close()
+    cur.close()
+    print("[CLOSE] MYSQL...............................................")
+    yield
+
+
+class MysqlConnect(object):
+    """
+    数据库连接类
+    """
+    def __init__(self, host, port, user, passwd, db):
+        self.conn = pymysql.connect(
+            host=host,
+            port=port,
+            user=user,
+            passwd=passwd,
+            db=db,
+            charset='utf8',
+            cursorclass=pymysql.cursors.DictCursor
+        )
+        self.cur = self.conn.cursor()
+
+    def __enter__(self):
+        return (self.cur, self.conn)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.conn.close()
+        self.cur.close()
+
+
+
+
+class MysqlOperatorYield(object):
+    """
+    数据库操作类
+    """
+    def __init__(self, host=DB_HOST, port=DB_PORT, user=DB_USER, passwd=DB_PASSWORD, db=MONIT_DB_NAME):
+        self.host = host
+        self.port = int(port)
+        self.user = user
+        self.passwd = passwd
+        self.db = db
+        self.charset = 'utf8'
+
+    def dqlMysql(self, sql):
+        """
+        DQL 语句执行
+        :param sql: SQL语句
+        :return:
+        """
+        # 创建数据库连接
+        with MysqlConnect(self.host, self.port, self.user, self.passwd, self.db) as (cur, conn):
+            if not cur or not conn:
+                return {'status': 501, 'data': "数据库连接异常"}
+            try:
+                cur = conn.cursor()
+                cur.execute('SET NAMES utf8;')
+                cur.execute('SET CHARACTER SET utf8;')
+                cur.execute('SET character_set_connection=utf8;')
+                cur.execute('SET SESSION group_concat_max_len = 18446744073709547520;')
+                # 执行SQL语句
+                cur.execute(sql)
+                # 获取所有记录列表
+                result = cur.fetchall()
+            except Exception as e:
+                logging.exception(sys.exc_info())
+                return {'status': 500, "data": str(e)}
+        return {'status': 200, "data": result}
+
+    def dmlMysql(self, sql):
+        """
+        DML 语句执行
+        :param sql: SQL语句
+        :return:
+        """
+        # 创建数据库连接
+        with MysqlConnect(self.host, self.port, self.user, self.passwd, self.db) as (cur, conn):
+            if not cur or not conn:
+                return {'status': 501, 'data': "数据库连接异常"}
+            try:
+                cur = conn.cursor()
+                cur.execute('SET NAMES utf8;')
+                cur.execute('SET CHARACTER SET utf8;')
+                cur.execute('SET character_set_connection=utf8;')
+                cur.execute('SET SESSION group_concat_max_len = 18446744073709547520;')
+                cur.execute(sql)
+                effectRow = cur.rowcount  # 受影响行数
+                # 提交到数据库执行
+                conn.commit()
+            except Exception as e:
+                logging.info(sql)
+                logging.exception(sys.exc_info())
+                return {'status': 500, "data": str(e)}
+        return {'status': 200, "data": "受影响行数：%s" % str(effectRow)}
+
+    def dmlMysqlACID(self, sql):
+        """
+        DML 语句执行 --带事务类型
+        :param sql: SQL语句
+        :return:
+        """
+        # 创建数据库连接
+        with MysqlConnect(self.host, self.port, self.user, self.passwd, self.db) as (cur, conn):
+            if not cur or not conn:
+                return {'status': 501, 'data': "数据库连接异常"}
+            try:
+                cur = conn.cursor()
+                cur.execute('SET NAMES utf8;')
+                cur.execute('SET CHARACTER SET utf8;')
+                cur.execute('SET character_set_connection=utf8;')
+                cur.execute('SET SESSION group_concat_max_len = 18446744073709547520;')
+                cur.execute(sql)
+                effectRow = cur.rowcount  # 受影响行数
+            except Exception as e:
+                conn.rollback()
+                logging.exception(sys.exc_info())
+                return {'status': 500, "data": str(e)}
+            cur.execute('SET NAMES utf8;')
+            conn.autocommit = True
+        return {'status': 200, "data": "受影响行数：%s" % str(effectRow)}
+
+    def ddlMysqlACID(self, sql_list):
+        """
+        DDL 语句执行 --带事务类型
+        :param sql: SQL语句
+        :return:
+        """
+        # 创建数据库连接
+        with MysqlConnect(self.host, self.port, self.user, self.passwd, self.db) as (cur, conn):
+            if not cur or not conn:
+                return {'status': 501, 'data': "数据库连接异常"}
+            try:
+                cur = conn.cursor()
+                cur.execute('SET NAMES utf8;')
+                cur.execute('SET CHARACTER SET utf8;')
+                cur.execute('SET character_set_connection=utf8;')
+                cur.execute('SET SESSION group_concat_max_len = 18446744073709547520;')
+                date_results = []
+                for sql in sql_list:
+                    cur.execute(sql)
+                    date_results = [row for row in cur.fetchall()]
+                    effectRow = cur.rowcount  # 受影响行数
+                    date_results.append({'date_results': date_results, 'effectRow': effectRow})
+            except Exception as e:
+                conn.rollback()
+                logging.exception(sys.exc_info())
+                return {'status': 500, "data": str(e)}
+            cur.execute('SET NAMES utf8;')
+            conn.autocommit = True
+        return {'status': 200, "data": date_results}
