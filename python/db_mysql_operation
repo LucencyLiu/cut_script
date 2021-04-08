@@ -1,0 +1,260 @@
+# -*- coding:utf-8 -*-
+from __future__ import absolute_import
+import time
+from basic.db_mysql import dqlMysqlDmlYield
+from basic.db_mysql import dmlMysqlDmlYield
+#from basic.db_mysql import MysqlOperator
+#from db_mysql import MysqlDmlYield
+#from basic.mysql_config import PLATFORM_DATABASES, APOLLO_DATABASES
+from basic.mysql_config import DB_NAME, DB_HOST, DB_PORT, DB_USER, DB_PASSWORD
+from basic.mysql_config import YDH_DB_CODE
+
+import logging
+
+# class PlatformMysqlOperator(MysqlOperator):
+# 	"""
+# 	platform 库操作类
+# 	"""
+# 	def __init__(self):
+# 		self.local_mysql_helper = MysqlOperator(host=DB_HOST, port=DB_PORT, user=DB_USER, passwd=DB_PASSWORD, db=DB_NAME)
+#
+# 	# 一库登录信息及账号清理  SELECT * FROM sequence.t_datasource_config GROUP BY fregion;
+# 	def updata_mobile(self, host, url, last_yeas):
+#
+# 		sql = f"SELECT fcount FROM monit. where fhost = {host} and furi = {url} and fstartTime like '%%{last_yeas}%%' order by fcount desc"
+#
+# 		return self.local_mysql_helper.dmlMysql(sql)['data']
+
+#ProductSqlPlatform
+def Clearydh(select, delete, page=1, size=1, fdb_region=''):
+	# 查询数据库操作
+	# 1:1
+	S_t_service_instance = f'SELECT fid,fcorpId FROM t_service_instance  WHERE fdb_region = "{fdb_region}" LIMIT {page},{size};'
+	R_t_service_instance_list = select.send(S_t_service_instance)
+	finstanceId = R_t_service_instance_list[0]['fid']
+	fcorpid = R_t_service_instance_list[0]['fcorpId']
+
+	# S_t_corp = f'SELECT fmobile,fcreator FROM t_corp  WHERE fid = {fcorpid};'
+	# R_t_corp_list = select.send(S_t_corp)
+	# print("*" * 15, R_t_corp_list, "*" * 15)
+	# fmobile = R_t_corp_list[0]['fmobile']
+	# fcreator = R_t_corp_list[0]['fcreator']
+
+	# 1:N
+	S_t_instance_user_relation = f'SELECT fuserName FROM t_instance_user_relation  WHERE finstanceId = {finstanceId}'
+	#S_t_instance_user_relation = f'SELECT fuserName FROM t_instance_user_relation  WHERE finstanceId = 1277106'
+	RN_t_instance_user_relation_list = select.send(S_t_instance_user_relation)
+	print(type(RN_t_instance_user_relation_list),len(RN_t_instance_user_relation_list),RN_t_instance_user_relation_list)
+	RS_t_instance_user_relation_list = []
+	for i in range(len(RN_t_instance_user_relation_list)):
+		RS_t_instance_user_relation_list.append(RN_t_instance_user_relation_list[i]['fuserName'])
+	# 1：N 关系时 sql in 的内容中不能为空或者一个元素
+	if len(RS_t_instance_user_relation_list) <= 1:
+		RS_t_instance_user_relation_list.append('NULL')
+		RS_t_instance_user_relation_list.append('NULL')
+	R_t_instance_user_relation_list = tuple(RS_t_instance_user_relation_list)
+
+	SSql = (R_t_service_instance_list, R_t_instance_user_relation_list)
+
+	# SSql = (R_t_service_instance_list, fmobile, fcreator, R_t_instance_user_relation_list)
+	# if fmobile == '12222222222':
+	# 	SSql = (R_t_service_instance_list, fcreator, R_t_instance_user_relation_list)
+	for i in range(len(SSql)):
+		print(i, ":", SSql[i])
+
+	# 删除数据库数据操作
+
+	# 1:1 DELETE From <tablename> where
+	#这个对应关系暂时不能删除
+	#D_t_service_instance = f'DELETE From t_service_instance  WHERE fid = {finstanceId};'
+
+	D_t_sms_account = f'DELETE From t_sms_account  WHERE fownerId = {fcorpid};'
+	D_t_sms_cost_record = f'DELETE From t_sms_cost_record  WHERE faccountId = {fcorpid};'
+	D_t_corp = f'DELETE From t_corp where fid={fcorpid}'
+
+	# D_t_pass_port = f'DELETE From t_pass_port  WHERE fmobile = "{fmobile}";'
+	# D_t_active_code = f'DELETE From t_active_code  WHERE fmobile = "{fmobile}";'
+	# D_t_apply_info = f'DELETE From t_apply_info  WHERE fuserName = "{fcreator}";'
+	# D_t_pass_port_user_list = f'DELETE From  t_pass_port_user_list  WHERE fuserName = "{fcreator}";'
+
+	# 1:N
+	print(R_t_instance_user_relation_list)
+	time.sleep(1)
+	D_t_user = F'DELETE From t_user  WHERE fusername in {R_t_instance_user_relation_list};'
+	D_t_push_identify = F'DELETE From t_push_identify  WHERE fusername in {R_t_instance_user_relation_list};'
+	D_t_instance_user_relation_user = f'DELETE From t_instance_user_relation  WHERE fusername in {R_t_instance_user_relation_list}'
+
+	DNsql = (D_t_user, D_t_push_identify,D_t_sms_account, D_t_instance_user_relation_user)
+	#DSql = (D_t_sms_account, D_t_sms_cost_record, D_t_active_code, D_t_pass_port, D_t_pass_port_user_list, D_t_apply_info, D_t_corp, D_t_service_instance)
+	# if fmobile == '12222222222':
+	# 	DSql = (D_t_sms_account, D_t_sms_cost_record, D_t_pass_port_user_list, D_t_apply_info, D_t_corp, D_t_service_instance)
+
+	#DDsql = DNsql + DSql
+	DDsql = DNsql
+	for j in range(len(DDsql)):
+		print(DDsql[j])
+		delete.send(DDsql[j])
+
+def Clearydh2(select, delete, page, size, fdb_region=''):
+	# 查询 登录账号 与 fcorpid 对应关系表
+	St_instance_user_relation = f'SELECT fcorpId,fuserName FROM t_instance_user_relation LIMIT 1,1;'
+	#St_instance_user_relation = f'SELECT fcorpId,fuserName FROM t_instance_user_relation LIMIT {page},{size};'
+	RN_t_instance_user_relation = select.send(St_instance_user_relation)
+	fcorpId = RN_t_instance_user_relation[0]['fcorpId']
+	fuserName = RN_t_instance_user_relation[0]['fuserName']
+
+	# 查询分区信息是否存在
+	St_service_instance = f'SELECT * FROM t_service_instance  WHERE fcorpId = "{fcorpId}"'
+	#St_service_instance = f'SELECT * FROM t_service_instance  WHERE fcorpId = "37547"'
+	R_t_service_instance = select.send(St_service_instance)
+	if type(R_t_service_instance) is tuple:
+		#不可以这样判断，这个判断是失效的
+		print("分区信息依然存在，不需要删除数据")
+		return
+
+	Dt_user = f'Delete from t_user where fuserName = "{fuserName}"'
+	delete.send(Dt_user)
+	Dt_sms_cost_record = f'Delete from t_sms_cost_record where faccountId = "{fcorpId}"'
+	delete.send(Dt_sms_cost_record)
+	Dt_instance_user_relation = f'Delete from t_instance_user_relation where fcorpId = "{fcorpId}"'
+	delete.send(Dt_instance_user_relation)
+
+	return
+
+def ClearMobile(select, delete, page, size, fdb_region=''):
+	# 查询 一库第一条数据的 finstanceId  与 fcorpid
+	fdb_region = 'rdsqejfvbqejfvb'
+	S_t_service_instance = f'SELECT fid,fcorpId FROM t_service_instance  WHERE fdb_region = "{fdb_region}" ORDER BY fid DESC LIMIT {page},{size};'
+	R_t_service_instance_list = select.send(S_t_service_instance)
+	finstanceId = R_t_service_instance_list[0]['fid']
+	fcorpid = R_t_service_instance_list[0]['fcorpId']
+
+	# 通过 fcorpid 查询 手机号 和 大B登录账号
+	S_t_corp = f'SELECT fmobile,fcreator FROM t_corp  WHERE fid = {fcorpid};'
+	R_t_corp_list = select.send(S_t_corp)
+	fmobile = R_t_corp_list[0]['fmobile']
+	fcreator = R_t_corp_list[0]['fcreator']
+
+
+	finfo = [finstanceId, fcorpid, fmobile, fcreator]
+	print(finfo)
+	if len(finfo) < 4:
+		print(f'finfo is {finfo} , len is {len(finfo)} , 信息不完整，返回')
+		return
+	elif finstanceId is None :
+		print(f'finstanceId is None')
+		return
+	elif fcorpid is None:
+		print(f'fcorpid is None')
+		return
+	elif fmobile is None:
+		print(f'fmobile is None')
+		return
+	elif fcreator is None:
+		print(f'fcreator is None')
+		return
+
+	# 通过 fcorpid 删除短信账号 和 短信扣款
+	D_t_sms_account = f'DELETE From t_sms_account  WHERE fownerId = {fcorpid};'
+	delete.send(D_t_sms_account)
+
+	D_t_sms_cost_record = f'DELETE From t_sms_cost_record  WHERE faccountId = {fcorpid};'
+	delete.send(D_t_sms_cost_record)
+
+	# 通过 fmobile 手机号 删除通行证 和 验证码
+	if fmobile != '12222222222':
+		D_t_pass_port = f'DELETE From t_pass_port  WHERE fmobile = "{fmobile}";'
+		delete.send(D_t_pass_port)
+	#此表已经剩余 95条数据
+	#D_t_active_code = f'DELETE From t_active_code  WHERE fmobile = "{fmobile}";'
+	#delete.send(D_t_active_code)
+
+	# 通过 fcreator 大B账号 删除注册信息 和 版本信息
+	D_t_apply_info = f'DELETE From t_apply_info  WHERE fuserName = "{fcreator}";'
+	delete.send(D_t_apply_info)
+	D_t_pass_port_user_list = f'DELETE From  t_pass_port_user_list  WHERE fuserName = "{fcreator}";'
+	delete.send(D_t_pass_port_user_list)
+	#print(D_t_sms_account,D_t_sms_cost_record,D_t_pass_port, D_t_active_code,D_t_apply_info,D_t_pass_port_user_list)
+
+	#临时删除 租户分库信息
+	D_t_service_instance = f'Delete FROM t_service_instance  WHERE fid = "{finstanceId}";'
+	delete.send(D_t_service_instance)
+	print("*"*30,f'删除 {finstanceId} 的分库信息')
+
+def ClearUsername(select, delete, page, size, fdb_region=''):
+	# 查询 一库第一条数据的 finstanceId  与 fcorpid
+	fdb_region = 'rdsqejfvbqejfvb'
+	S_t_service_instance = f'SELECT fid,fcorpId FROM t_service_instance  WHERE fdb_region = "{fdb_region}" LIMIT {page},{size};'
+	R_t_service_instance_list = select.send(S_t_service_instance)
+	finstanceId = R_t_service_instance_list[0]['fid']
+	fcorpId = R_t_service_instance_list[0]['fcorpId']
+	finfo = [finstanceId, fcorpId]
+	print(finfo)
+	if len(finfo) < 2:
+		print(f'finfo is {finfo} , len is {len(finfo)} , 信息不完整，返回')
+		return
+	elif finstanceId is None:
+		print(f'finstanceId is None')
+		return
+	elif fcorpId is None:
+		print(f'fcorpid is None')
+		return
+
+	# 通过 finstanceId 获取 fusername, 因为有索引
+	S_t_instance_user_relation = f'SELECT fid,fuserName FROM t_instance_user_relation WHERE finstanceId = {finstanceId}'
+	#S_t_instance_user_relation = f'SELECT fid,fuserName FROM t_instance_user_relation WHERE finstanceId=375152 '
+	R_t_instance_user_relation = select.send(S_t_instance_user_relation)
+	print(R_t_instance_user_relation)
+	i = 0
+	for i in range(len(R_t_instance_user_relation)):
+		fusername = R_t_instance_user_relation[i]['fuserName']
+		D_t_user = f'DELETE From t_user  WHERE FUSERNAME = "{fusername}";'
+		delete.send(D_t_user)
+		D_t_push_identify = f'DELETE From t_push_identify  WHERE fuserName = "{fusername}";'
+		delete.send(D_t_push_identify)
+		D_t_instance_user_relation= f'DELETE From t_instance_user_relation  WHERE fuserName = "{fusername}";'
+		delete.send(D_t_instance_user_relation)
+
+	# 通过 fcorpid  删除大B 信息
+	D_t_corp = f'DELETE From t_corp  WHERE fid = "{fcorpId}";'
+	delete.send(D_t_corp)
+
+	# 临时删除 租户分库信息
+	D_t_service_instance = f'Delete FROM t_service_instance  WHERE fid = "{finstanceId}";'
+	delete.send(D_t_service_instance)
+	print("*" * 30, f'删除 {finstanceId} 的分库信息')
+
+
+
+
+
+
+
+
+
+select = dqlMysqlDmlYield(host='192.168.1.214', port=3306, user='readonly', passwd='readonly', db='platform')
+select.send(None)
+delete = dmlMysqlDmlYield(host='192.168.1.214', port=3306, user='readonly', passwd='readonly', db='platform')
+delete.send(None)
+
+while True:
+	page = 1
+	while page < 200000:
+		ClearUsername(select, delete, page=0, size=1, fdb_region=YDH_DB_CODE['ydh'])
+		page += 1
+
+select.send("STP")
+select.close()
+delete.send("STP")
+delete.close()
+#178547 #
+#121387 24小时 yield
+#101229 2小时  去掉手机号筛选 12222222222
+#59671 2小时 循环内 size 改成1，而不是 size 本身
+#50000 1小时
+#47414 30分钟 生成器开启和关闭写外部，不在循环内
+# 12080 16:21
+
+
+
+
